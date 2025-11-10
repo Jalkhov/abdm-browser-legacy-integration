@@ -7,7 +7,7 @@
 		<em:iconURL>chrome://abdm_legacy/skin/icons/icon-128.png</em:iconURL>
 		<em:version>1.1.2</em:version>
 		<em:type>2</em:type>
-		<em:name>AB Download Manager Legacy</em:name>
+		<em:name>AB Download Manager</em:name>
 		<em:description>Legacy integration for AB Download Manager aimed at XUL-based browsers.</em:description>
 		<em:creator>Jalkhov</em:creator>
 		<em:homepageURL>https://github.com/Jalkhov/abdm-browser-legacy-integration</em:homepageURL>
