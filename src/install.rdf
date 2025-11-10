@@ -5,7 +5,7 @@
 	<Description about="urn:mozilla:install-manifest">
 		<em:id>{45d0913e-1c2c-4a94-beb7-3f6225122ccd}</em:id>
 		<em:iconURL>chrome://abdm_legacy/skin/icons/icon-128.png</em:iconURL>
-		<em:version>1.1.2</em:version>
+		<em:version>1.1.3</em:version>
 		<em:type>2</em:type>
 		<em:name>AB Download Manager</em:name>
 		<em:description>Legacy integration for AB Download Manager aimed at XUL-based browsers.</em:description>

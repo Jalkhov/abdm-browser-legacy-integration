@@ -1,5 +1,7 @@
 # AB Download Manager Browser Legacy Integration Repository
 
+![Status](https://img.shields.io/badge/status-beta-red)
+
 This extension is a port of [ab-download-manager-browser-integration](https://github.com/amir1376/ab-download-manager-browser-integration) for XUL-based browsers; so far, it has only been tested on Palemoon 33.9.1 x64 Windows.
 
 > If you are looking for the main app repository, use [this link](https://github.com/amir1376/ab-download-manager).
