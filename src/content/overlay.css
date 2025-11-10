@@ -1,0 +1,11 @@
+#abdm-toolbar-button {
+  list-style-image: url('chrome://abdm_legacy/skin/icons/icon-16.png') !important;
+}
+
+toolbar[iconsize="large"] #abdm-toolbar-button {
+  list-style-image: url('chrome://abdm_legacy/skin/icons/icon-24.png') !important;
+}
+
+.abdm-menuitem-iconic {
+  -moz-image-region: auto;
+}

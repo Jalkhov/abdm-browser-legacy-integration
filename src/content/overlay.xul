@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<?xml-stylesheet href="chrome://abdm_legacy/content/overlay.css" type="text/css"?>
+<overlay
+	xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+	<menuitem id="abdm-send-link"
+            label="Enviar a AB Download Manager"
+            oncommand="ABDMPort.onSendLinkCommand();"
+            hidden="true"/>
+	<script type="application/javascript" src="chrome://abdm_legacy/content/logger.js"/>
+	<script type="application/javascript" src="chrome://abdm_legacy/content/backend.js"/>
+	<script type="application/javascript" src="chrome://abdm_legacy/content/overlay.js"/>
+	<toolbarpalette id="BrowserToolbarPalette">
+		<toolbarbutton id="abdm-toolbar-button" class="toolbarbutton-1" removable="true" label="ABDM" tooltiptext="AB Download Manager Legacy" type="menu" image="chrome://abdm_legacy/skin/icons/icon-16.png" oncommand="ABDMPort.openOptions();">
+			<menupopup id="abdm-toolbar-menu">
+				<menuitem type="checkbox" id="abdm-autocapture" label="Autocapture links" oncommand="ABDMPort.togglePrefBool('autoCaptureLinks', this.getAttribute('checked')=='true');"/>
+				<menuitem type="checkbox" id="abdm-showpopups" label="Show Popups" oncommand="ABDMPort.togglePrefBool('popupEnabled', this.getAttribute('checked')=='true');"/>
+				<menuitem type="checkbox" id="abdm-silentadd" label="Add downloads silently" oncommand="ABDMPort.togglePrefBool('silentAddDownload', this.getAttribute('checked')=='true');"/>
+				<menuseparator/>
+				<menuitem id="abdm-more-settings" label="More Settings" oncommand="ABDMPort.openOptions();"/>
+			</menupopup>
+		</toolbarbutton>
+	</toolbarpalette>
+	<template id="abdm-inject-context"></template>
+</overlay>

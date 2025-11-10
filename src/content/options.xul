@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<?xml-stylesheet href="chrome://global/skin/" type="text/css"?>
+<window id="abdm-options" title="AB Download Manager - Opciones"
+	xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" width="520" height="420">
+	<script type="application/javascript" src="chrome://abdm_legacy/content/options.js"/>
+	<vbox flex="1" pack="start" style="padding:10px">
+		<!-- Auto capture -->
+		<hbox>
+			<checkbox id="opt-autoCaptureLinks" label="Auto Capture Links"/>
+		</hbox>
+		<description value="When you click on link on your browser the link will automatically captured for download by the App" style="margin-left:18px;margin-top:6px;margin-bottom:10px;"/>
+		<!-- Registered file types textarea -->
+		<label value="Registered file extensions (one per space or newline)"/>
+		<!-- larger textarea for better visibility -->
+		<textbox id="opt-registered-filetypes" multiline="true" flex="1" rows="6" style="min-height:120px;"/>
+		<description value="Enter each file extension that you want to be captured then press enter" style="margin-left:4px;margin-top:6px;margin-bottom:10px;"/>
+
+		<!-- Ignored URL patterns -->
+		<label value="Ignored Url patterns"/>
+		<textbox id="opt-ignored-patterns" multiline="true" flex="1" rows="4" style="min-height:80px;"/>
+		<hbox>
+			<spacer flex="1"/>
+			<button id="opt-reset-patterns" label="Reset to default"/>
+		</hbox>
+		<separator/>
+		<hbox>
+			<spacer flex="1"/>
+			<button label="Guardar" oncommand="ABDMOptions.save()"/>
+			<button label="Cerrar" oncommand="window.close()"/>
+		</hbox>
+	</vbox>
+</window>

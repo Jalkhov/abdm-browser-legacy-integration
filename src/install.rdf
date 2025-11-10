@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='utf-8'?>
+<RDF
+	xmlns="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+	xmlns:em="http://www.mozilla.org/2004/em-rdf#">
+	<Description about="urn:mozilla:install-manifest">
+		<em:id>{45d0913e-1c2c-4a94-beb7-3f6225122ccd}</em:id>
+		<em:iconURL>chrome://abdm_legacy/skin/icons/icon-128.png</em:iconURL>
+		<em:version>1.1.2</em:version>
+		<em:type>2</em:type>
+		<em:name>AB Download Manager Legacy</em:name>
+		<em:description>Legacy integration for AB Download Manager aimed at XUL-based browsers.</em:description>
+		<em:creator>Jalkhov</em:creator>
+		<em:homepageURL>https://github.com/Jalkhov/abdm-browser-legacy-integration</em:homepageURL>
+		<em:optionsURL>chrome://abdm_legacy/content/options.xul</em:optionsURL>
+		<em:targetApplication>
+			<Description>
+				<em:id>{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}</em:id>
+				<em:minVersion>28.*</em:minVersion>
+				<em:maxVersion>*</em:maxVersion>
+			</Description>
+		</em:targetApplication>
+	</Description>
+</RDF>
