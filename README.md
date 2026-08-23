@@ -1,39 +1,55 @@
-# AB Download Manager Browser Legacy Integration Repository
+# AB Download Manager Browser Legacy Integration
 
 ![Status](https://img.shields.io/badge/status-beta-red)
 
-This extension is a port of [ab-download-manager-browser-integration](https://github.com/amir1376/ab-download-manager-browser-integration) for XUL-based browsers; so far, it has only been tested on Palemoon 33.9.1 x64 Windows.
+This extension is a port of the official [ab-download-manager-browser-integration](https://github.com/amir1376/ab-download-manager-browser-integration) specifically designed for **XUL-based browsers** (legacy engine). So far, it has been tested and verified on **Pale Moon 33.9.1 x64 (Windows)**.
 
-> If you are looking for the main app repository, use [this link](https://github.com/amir1376/ab-download-manager).
-## Usage
+> **Note:** If you are looking for the main application repository, please use [this link](https://github.com/amir1376/ab-download-manager).
 
-In order to use this extension you need to [install](https://abdownloadmanager.com/#download) AB Download Manager.
+## Prerequisites
 
-### This extension does the following
+In order to use this extension, you must have the main **AB Download Manager** application installed and running on your system.
+* [Download AB Download Manager](https://abdownloadmanager.com/#download)
 
-- [ ] Adds a `Download With AB DM` in browser's context menu
-- [x] Automatically captures download links when the user wants to download the file from their browser
-- [ ] Show a `Download Selected` popup when the user selects some section of the page that contains links
+## Features & Roadmap
 
-## How To Build (needs Python)
-In order to build this extension locally:
+The integration aims to provide a seamless downloading experience between your legacy browser and the desktop app.
+
+- [x] **Automatic Link Capture:** Automatically intercepts native downloads and forwards them to AB Download Manager.
+- [x] **Header Passthrough:** Securely forwards browser session data (User-Agent, Referer, Cookies) to bypass common hotlink protections and server restrictions.
+- [ ] **Context Menu Integration:** Add a `Download With AB DM` option when right-clicking links or media.
+- [ ] **Batch Downloading:** Show a `Download Selected` popup when the user highlights a section of a webpage containing multiple links.
+
+*Tip: You can manage which file extensions are automatically captured by accessing the add-on options via `Tools > Add-ons > AB Download Manager > Options`.*
+
+## How To Build
+
+To build this extension locally from source, you will need **Python 3**.
+
+Run the following command in your terminal at the root of the repository:
 
 ```bash
-build
+./build.sh
 ```
 
-The output .xpi file containing the extension will be placed at the root of the repository.
+*(On Windows, this executes `build.bat`; on Unix, run `./build.sh`)*
 
-## Repositories And Source Code
+The script will package the extension in store mode (no compression) and output an `.xpi` file in the root directory, ready to be dragged and dropped into your browser.
 
-There are multiple repositories related to the **AB Download Manager** project:
+## Ecosystem Repositories
 
-| Repository                                                                                                 | Description                                                                   |
-|------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|
-| [Main Application](https://github.com/amir1376/ab-download-manager)                                        | Contains the  **Application** that runs on your  **device**                   |
-| [Browser Legacy Integration](https://github.com/Jalkhov/abdm-browser-legacy-integration)  (You are here) | Contains the **Browser Extension** to be installed on your  **browser**       |
-| [Website](https://github.com/amir1376/ab-download-manager-website)                                         | Contains the **AB Download Manager** [website](https://abdownloadmanager.com) |
+There are multiple repositories related to the **AB Download Manager** ecosystem:
 
-Much of this port was made possible thanks to GitHub Copilot.
+| Repository | Description |
+| --- | --- |
+| [Main Application](https://github.com/amir1376/ab-download-manager) | The core desktop **Application** that runs on your device. |
+| [Browser Legacy Integration](https://github.com/Jalkhov/abdm-browser-legacy-integration) (You are here) | The **Browser Extension** for XUL-based web browsers. |
+| [Website](https://github.com/amir1376/ab-download-manager-website) | The source code for the official [website](https://abdownloadmanager.com). |
 
-If you like this work, please consider giving it a star ⭐. Also, leave one for the main project. Thank you ❤️ [AmirHossein Abdolmotallebi](https://github.com/amir1376) for this amazing program.
+## Acknowledgments
+
+Much of this port was made possible thanks to AI assistance (GitHub Copilot).
+
+If you find this integration useful, please consider giving this repository a star ⭐. Also, be sure to leave a star for the main project to support the original developer!
+
+Thank you ❤️ [AmirHossein Abdolmotallebi](https://github.com/amir1376) for creating such an amazing program.
