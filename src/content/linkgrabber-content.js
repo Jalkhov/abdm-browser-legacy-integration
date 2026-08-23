@@ -68,7 +68,7 @@
           pageUrl: location.href || null,
           suggestedName: suggested,
         },
-        "*"
+        "*",
       );
     } catch (e) {
       /* ignore */
@@ -96,7 +96,7 @@
                 try {
                   if (window.console && window.console.log)
                     window.console.log(
-                      "ABDM linkgrabber: prevented default click for " + url
+                      "ABDM linkgrabber: prevented default click for " + url,
                     );
                 } catch (e) {}
               } catch (e) {}
@@ -111,7 +111,7 @@
                         if (window.console && window.console.log)
                           window.console.log(
                             "ABDM linkgrabber: called window.stop() to halt navigation for " +
-                              url
+                              url,
                           );
                       } catch (e) {}
                     }
@@ -125,7 +125,7 @@
         }
       } catch (e) {}
     },
-    true
+    true,
   );
 
   // Also listen to mousedown to catch links that start download on press
@@ -150,7 +150,8 @@
                 try {
                   if (window.console && window.console.log)
                     window.console.log(
-                      "ABDM linkgrabber: prevented default mousedown for " + url
+                      "ABDM linkgrabber: prevented default mousedown for " +
+                        url,
                     );
                 } catch (e) {}
               } catch (e) {}
@@ -164,7 +165,7 @@
                         if (window.console && window.console.log)
                           window.console.log(
                             "ABDM linkgrabber: called window.stop() to halt navigation for " +
-                              url
+                              url,
                           );
                       } catch (e) {}
                     }
@@ -178,7 +179,7 @@
         }
       } catch (e) {}
     },
-    true
+    true,
   );
 
   // Scan existing anchors on load
@@ -210,7 +211,10 @@
             ? m.parentElement.src
             : null);
         if (src) {
-          if (isRegistered(src) || src.includes(".m3u8")) postDetected(src);
+          if (isRegistered(src) || src.includes(".m3u8")) {
+            // Se elimina postDetected(src). Solo se marca para futura recolección pasiva.
+            m.dataset.abdmCandidate = "1";
+          }
         }
       });
     } catch (e) {}
@@ -226,6 +230,13 @@
 
   // Monkey-patch XHR to detect responses containing m3u8 or manifest JSON
   (function () {
+    // Almacenamiento pasivo para usar en el futuro popup de "Download Selected"
+    window._abdm_captured_media = window._abdm_captured_media || new Set();
+
+    function silentlyCapture(url) {
+      if (url) window._abdm_captured_media.add(url);
+    }
+
     const _open = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function (method, url) {
       this._abdm_url = url;
@@ -239,7 +250,7 @@
             const url = this.responseURL || this._abdm_url;
             if (!url) return;
             if (url.includes(".m3u8")) {
-              postDetected(url);
+              silentlyCapture(url);
               return;
             }
             const contentType = this.getResponseHeader
@@ -249,7 +260,7 @@
               contentType &&
               contentType.indexOf("application/vnd.apple.mpegurl") !== -1
             ) {
-              postDetected(url);
+              silentlyCapture(url);
               return;
             }
             // small heuristic: if responseText contains EXTM3U (m3u8) or looks like a manifest with media links
@@ -257,7 +268,7 @@
               this.responseText &&
               this.responseText.indexOf("EXTM3U") !== -1
             ) {
-              postDetected(url);
+              silentlyCapture(url);
               return;
             }
             // JSON manifests: try parse and search for 'url' fields
@@ -269,7 +280,7 @@
               try {
                 const json = JSON.parse(this.responseText);
                 const found = findUrlsInObject(json);
-                if (found) postDetected(found);
+                if (found) silentlyCapture(found);
               } catch (e) {}
             }
           } catch (e) {}
@@ -287,11 +298,11 @@
             const url = resp.url;
             const ct = resp.headers ? resp.headers.get("content-type") : null;
             if (url && url.indexOf(".m3u8") !== -1) {
-              postDetected(url);
+              silentlyCapture(url);
               return resp;
             }
             if (ct && ct.indexOf("application/vnd.apple.mpegurl") !== -1) {
-              postDetected(url);
+              silentlyCapture(url);
               return resp;
             }
             // try clone and peek
@@ -299,14 +310,14 @@
               const clone = resp.clone();
               const text = await clone.text();
               if (text && text.indexOf("EXTM3U") !== -1) {
-                postDetected(url);
+                silentlyCapture(url);
                 return resp;
               }
               if (ct && ct.indexOf("application/json") !== -1) {
                 try {
                   const json = JSON.parse(text);
                   const found = findUrlsInObject(json);
-                  if (found) postDetected(found);
+                  if (found) silentlyCapture(found);
                 } catch (e) {}
               }
             } catch (e) {}
