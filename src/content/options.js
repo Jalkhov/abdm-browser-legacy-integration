@@ -4,52 +4,54 @@ var ABDMOptions = {
       const prefs = Components.classes[
         "@mozilla.org/preferences-service;1"
       ].getService(Components.interfaces.nsIPrefBranch);
-      // UI related prefs
-      try {
-        document.getElementById("opt-autoCaptureLinks").checked =
-          prefs.getBoolPref("abdm_legacy.autoCaptureLinks");
-      } catch (e) {}
 
-      // registered file types: stored as space-separated string in pref
-      try {
-        const types = prefs.getCharPref("abdm_legacy.registeredFileTypes");
-        if (types !== undefined)
-          document.getElementById("opt-registered-filetypes").value = types;
-      } catch (e) {}
+      const autoCaptureEl = document.getElementById("opt-autoCaptureLinks");
+      if (autoCaptureEl) {
+        autoCaptureEl.checked = prefs.getBoolPref(
+          "abdm_legacy.autoCaptureLinks",
+        );
+      }
 
-      // ignored patterns
-      try {
-        document.getElementById("opt-ignored-patterns").value =
-          prefs.getCharPref("abdm_legacy.ignoredUrlPatterns");
-      } catch (e) {}
+      const fileTypesEl = document.getElementById("opt-registered-filetypes");
+      if (fileTypesEl) {
+        fileTypesEl.value = prefs.getCharPref(
+          "abdm_legacy.registeredFileTypes",
+        );
+      }
+
+      const patternsEl = document.getElementById("opt-ignored-patterns");
+      if (patternsEl) {
+        patternsEl.value = prefs.getCharPref("abdm_legacy.ignoredUrlPatterns");
+      }
     } catch (e) {
       Components.utils.reportError("ABDMOptions load error: " + e);
     }
   },
+
   save: function () {
     try {
       const prefs = Components.classes[
         "@mozilla.org/preferences-service;1"
       ].getService(Components.interfaces.nsIPrefBranch);
-      // UI prefs
-      try {
+
+      const autoCaptureEl = document.getElementById("opt-autoCaptureLinks");
+      if (autoCaptureEl) {
         prefs.setBoolPref(
           "abdm_legacy.autoCaptureLinks",
-          !!document.getElementById("opt-autoCaptureLinks").checked
+          !!autoCaptureEl.checked,
         );
-      } catch (e) {}
-      try {
-        prefs.setCharPref(
-          "abdm_legacy.registeredFileTypes",
-          document.getElementById("opt-registered-filetypes").value
-        );
-      } catch (e) {}
-      try {
-        prefs.setCharPref(
-          "abdm_legacy.ignoredUrlPatterns",
-          document.getElementById("opt-ignored-patterns").value
-        );
-      } catch (e) {}
+      }
+
+      const fileTypesEl = document.getElementById("opt-registered-filetypes");
+      if (fileTypesEl) {
+        prefs.setCharPref("abdm_legacy.registeredFileTypes", fileTypesEl.value);
+      }
+
+      const patternsEl = document.getElementById("opt-ignored-patterns");
+      if (patternsEl) {
+        prefs.setCharPref("abdm_legacy.ignoredUrlPatterns", patternsEl.value);
+      }
+
       window.close();
     } catch (e) {
       Components.utils.reportError("ABDMOptions save error: " + e);
@@ -87,9 +89,9 @@ window.addEventListener(
               document.getElementById("opt-ignored-patterns").value = "";
             } catch (e) {}
           },
-          false
+          false,
         );
     } catch (e) {}
   },
-  false
+  false,
 );
