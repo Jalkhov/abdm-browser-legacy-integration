@@ -45,10 +45,9 @@ var ABDMBackend = (function () {
         ) {
           const controller = new AbortController();
           const id = setTimeout(function () {
-            try {
-              controller.abort();
-            } catch (e) {}
+            controller.abort();
           }, timeoutMs || 2000);
+
           fetch(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -57,7 +56,23 @@ var ABDMBackend = (function () {
           })
             .then(function (resp) {
               clearTimeout(id);
-              resolve(resp);
+              // Estandarizar la respuesta para evitar lidiar con promesas de texto en tryEndpoints
+              resp
+                .text()
+                .then(function (text) {
+                  resolve({
+                    ok: resp.ok,
+                    status: resp.status,
+                    responseText: text,
+                  });
+                })
+                .catch(function () {
+                  resolve({
+                    ok: resp.ok,
+                    status: resp.status,
+                    responseText: "",
+                  });
+                });
             })
             .catch(function (err) {
               clearTimeout(id);
@@ -65,30 +80,31 @@ var ABDMBackend = (function () {
             });
         } else {
           // fallback to XHR when fetch/AbortController not available
-          try {
-            const xhr = new XMLHttpRequest();
-            xhr.open("POST", endpoint, true);
-            xhr.setRequestHeader(
-              "Content-Type",
-              "application/json;charset=UTF-8"
-            );
-            xhr.onreadystatechange = function () {
-              if (xhr.readyState === 4) {
-                // build a small response-like object
-                resolve({
-                  ok: xhr.status >= 200 && xhr.status < 300,
-                  status: xhr.status,
-                  responseText: xhr.responseText,
-                });
-              }
-            };
-            xhr.onerror = function (e) {
-              reject(e);
-            };
-            xhr.send(payload);
-          } catch (e) {
+          const xhr = new XMLHttpRequest();
+          xhr.open("POST", endpoint, true);
+          xhr.setRequestHeader(
+            "Content-Type",
+            "application/json;charset=UTF-8",
+          );
+          xhr.timeout = timeoutMs || 2000;
+
+          xhr.onreadystatechange = function () {
+            if (xhr.readyState === 4) {
+              resolve({
+                ok: xhr.status >= 200 && xhr.status < 300,
+                status: xhr.status,
+                responseText: xhr.responseText,
+              });
+            }
+          };
+
+          xhr.onerror = function (e) {
             reject(e);
-          }
+          };
+          xhr.ontimeout = function () {
+            reject(new Error("Timeout"));
+          };
+          xhr.send(payload);
         }
       } catch (e) {
         reject(e);
@@ -104,64 +120,40 @@ var ABDMBackend = (function () {
         if (i >= endpoints.length) return resolve(false);
         const endpoint = endpoints[i++];
         ABDMLogger.info("HTTP POST to " + endpoint + " payload=" + payload);
+
         fetchWithTimeout(endpoint, payload, 2000)
           .then(function (resp) {
-            try {
-              const status = resp.status || (resp && resp.ok ? 200 : 0);
-              ABDMLogger.info("HTTP response " + status + " for " + endpoint);
-              try {
-                const text =
-                  resp.responseText ||
-                  (typeof resp.text === "function" && resp.text
-                    ? resp.text()
-                    : null);
-                if (text) {
-                  // resp.text() may be a Promise when using fetch; attempt to print a snippet
-                  if (typeof text === "string") {
-                    ABDMLogger.info(
-                      "HTTP response body (snippet): " +
-                        text.substring(0, 1024).replace(/\n/g, " ")
-                    );
-                  } else if (typeof resp.text === "function") {
-                    resp.text().then(function (t) {
-                      ABDMLogger.info(
-                        "HTTP response body (snippet): " +
-                          (t || "").substring(0, 1024).replace(/\n/g, " ")
-                      );
-                    });
-                  }
-                }
-              } catch (e) {}
+            const status = resp.status || 0;
+            ABDMLogger.info("HTTP response " + status + " for " + endpoint);
 
-              if (
-                (resp.ok && resp.ok === true) ||
-                (status >= 200 && status < 300)
-              ) {
-                resolve(true);
-              } else {
-                next();
-              }
-            } catch (e) {
+            if (resp.responseText) {
+              ABDMLogger.info(
+                "HTTP response body (snippet): " +
+                  resp.responseText.substring(0, 1024).replace(/\n/g, " "),
+              );
+            }
+
+            if (resp.ok || (status >= 200 && status < 300)) {
+              resolve(true);
+            } else {
               next();
             }
           })
           .catch(function (err) {
-            ABDMLogger.warn(
-              "HTTP XHR/fetch error to " + endpoint + " : " + err
-            );
+            ABDMLogger.warn("HTTP request error to " + endpoint + " : " + err);
             next();
           });
       }
       next();
     });
   }
-
   // Build the payload array matching DownloadRequestItem minimal shape.
-  function buildPayload(url, pageUrl, suggestedName) {
+  function buildPayload(url, pageUrl, suggestedName, headers) {
     const item = {
       link: url,
       downloadPage: pageUrl || null,
-      headers: null,
+      // Si se envían headers, los asignamos; de lo contrario null
+      headers: headers && Object.keys(headers).length > 0 ? headers : null,
       description: null,
       suggestedName: suggestedName || null,
       type: "http",
@@ -171,7 +163,7 @@ var ABDMBackend = (function () {
 
   return {
     // send returns a Promise<boolean> indicating success (true) or failure (false)
-    send: function (url, pageUrl, suggestedName) {
+    send: function (url, pageUrl, suggestedName, headers) {
       return new Promise(function (resolve) {
         const prefs = getPrefs();
         let method = "auto";
@@ -190,10 +182,11 @@ var ABDMBackend = (function () {
         ABDMLogger.info(
           "configured method=" +
             method +
-            (configuredEndpoint ? " endpoint=" + configuredEndpoint : "")
+            (configuredEndpoint ? " endpoint=" + configuredEndpoint : ""),
         );
 
-        const payload = buildPayload(url, pageUrl, suggestedName);
+        // Pasamos los headers al payload
+        const payload = buildPayload(url, pageUrl, suggestedName, headers);
 
         const endpoints = [];
         if (configuredEndpoint) endpoints.push(configuredEndpoint);
@@ -207,10 +200,8 @@ var ABDMBackend = (function () {
         }
 
         if (method === "process") {
-          // process launching is best done in the overlay code where nsIProcess is available.
-          // Expose a small signal here to let overlay do it. For now, resolve false.
           ABDMLogger.warn(
-            "method=process not implemented in ABDMBackend; overlay should handle it."
+            "method=process not implemented in ABDMBackend; overlay should handle it.",
           );
           return resolve(false);
         }
