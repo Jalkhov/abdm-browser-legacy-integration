@@ -1,6 +1,6 @@
 (function () {
-  // This script runs in page context. It detects clicks on links, media tags and XHR/fetch responses
-  // and posts a message to the page window for the chrome overlay to pick up.
+  // This script runs in page context. It passively detects media tags, anchors, and XHR/fetch responses
+  // to populate a list for the future "Download Selected" batch download feature.
 
   const REGISTERED_FILE_TYPES = new Set([
     "zip",
@@ -44,144 +44,6 @@
     return ext && REGISTERED_FILE_TYPES.has(ext);
   }
 
-  function postDetected(url) {
-    try {
-      try {
-        // page-context log for debugging
-        if (window.console && window.console.log)
-          window.console.log("ABDM linkgrabber: detected " + url);
-      } catch (e) {}
-      // include the page URL and a suggestedName when available
-      let suggested = null;
-      try {
-        // if the element had a download attribute, prefer it as suggested name
-        if (document.activeElement && document.activeElement.tagName === "A") {
-          try {
-            suggested = document.activeElement.getAttribute("download") || null;
-          } catch (e) {}
-        }
-      } catch (e) {}
-      window.postMessage(
-        {
-          type: "abdm-detected",
-          url: url,
-          pageUrl: location.href || null,
-          suggestedName: suggested,
-        },
-        "*",
-      );
-    } catch (e) {
-      /* ignore */
-    }
-  }
-
-  // Click capture on links
-  document.addEventListener(
-    "click",
-    function (ev) {
-      try {
-        let el = ev.target;
-        while (el && el.nodeType === 1) {
-          if (el.tagName.toLowerCase() === "a" && el.href) {
-            const url = el.href;
-            if (isRegistered(url) || url.includes(".m3u8")) {
-              // prevent the browser from performing the default navigation/download
-              try {
-                if (ev && typeof ev.preventDefault === "function")
-                  ev.preventDefault();
-                if (ev && typeof ev.stopImmediatePropagation === "function")
-                  ev.stopImmediatePropagation();
-                if (ev && typeof ev.stopPropagation === "function")
-                  ev.stopPropagation();
-                try {
-                  if (window.console && window.console.log)
-                    window.console.log(
-                      "ABDM linkgrabber: prevented default click for " + url,
-                    );
-                } catch (e) {}
-              } catch (e) {}
-              postDetected(url);
-              // small timeout to stop any navigation that other handlers may have started
-              try {
-                setTimeout(function () {
-                  try {
-                    if (typeof window.stop === "function") {
-                      window.stop();
-                      try {
-                        if (window.console && window.console.log)
-                          window.console.log(
-                            "ABDM linkgrabber: called window.stop() to halt navigation for " +
-                              url,
-                          );
-                      } catch (e) {}
-                    }
-                  } catch (e) {}
-                }, 20);
-              } catch (e) {}
-            }
-            break;
-          }
-          el = el.parentNode;
-        }
-      } catch (e) {}
-    },
-    true,
-  );
-
-  // Also listen to mousedown to catch links that start download on press
-  document.addEventListener(
-    "mousedown",
-    function (ev) {
-      try {
-        let el = ev.target;
-        while (el && el.nodeType === 1) {
-          if (el.tagName.toLowerCase() === "a" && el.href) {
-            const url = el.href;
-            if (isRegistered(url) || url.includes(".m3u8")) {
-              // some sites begin downloads on mousedown; prevent default to stop
-              // the browser download and let the native app handle it
-              try {
-                if (ev && typeof ev.preventDefault === "function")
-                  ev.preventDefault();
-                if (ev && typeof ev.stopImmediatePropagation === "function")
-                  ev.stopImmediatePropagation();
-                if (ev && typeof ev.stopPropagation === "function")
-                  ev.stopPropagation();
-                try {
-                  if (window.console && window.console.log)
-                    window.console.log(
-                      "ABDM linkgrabber: prevented default mousedown for " +
-                        url,
-                    );
-                } catch (e) {}
-              } catch (e) {}
-              postDetected(url);
-              try {
-                setTimeout(function () {
-                  try {
-                    if (typeof window.stop === "function") {
-                      window.stop();
-                      try {
-                        if (window.console && window.console.log)
-                          window.console.log(
-                            "ABDM linkgrabber: called window.stop() to halt navigation for " +
-                              url,
-                          );
-                      } catch (e) {}
-                    }
-                  } catch (e) {}
-                }, 20);
-              } catch (e) {}
-            }
-            break;
-          }
-          el = el.parentNode;
-        }
-      } catch (e) {}
-    },
-    true,
-  );
-
   // Scan existing anchors on load
   function scanAnchors() {
     try {
@@ -189,7 +51,7 @@
       for (const a of anchors) {
         const url = a.href;
         if (isRegistered(url)) {
-          // we don't auto-send to avoid surprising user; just annotate dataset so overlay menu can find
+          // just annotate dataset so overlay menu can find it for batch download later
           a.dataset.abdmCandidate = "1";
         }
       }
@@ -212,7 +74,6 @@
             : null);
         if (src) {
           if (isRegistered(src) || src.includes(".m3u8")) {
-            // Se elimina postDetected(src). Solo se marca para futura recolección pasiva.
             m.dataset.abdmCandidate = "1";
           }
         }
@@ -228,9 +89,8 @@
     window.postMessage({ type: "abdm-ready" }, "*");
   } catch (e) {}
 
-  // Monkey-patch XHR to detect responses containing m3u8 or manifest JSON
+  // Monkey-patch XHR/Fetch to silently store URLs for batch downloading
   (function () {
-    // Almacenamiento pasivo para usar en el futuro popup de "Download Selected"
     window._abdm_captured_media = window._abdm_captured_media || new Set();
 
     function silentlyCapture(url) {
@@ -263,7 +123,6 @@
               silentlyCapture(url);
               return;
             }
-            // small heuristic: if responseText contains EXTM3U (m3u8) or looks like a manifest with media links
             if (
               this.responseText &&
               this.responseText.indexOf("EXTM3U") !== -1
@@ -271,7 +130,6 @@
               silentlyCapture(url);
               return;
             }
-            // JSON manifests: try parse and search for 'url' fields
             if (
               contentType &&
               contentType.indexOf("application/json") !== -1 &&
@@ -289,7 +147,6 @@
       return _send.apply(this, arguments);
     };
 
-    // patch fetch as well
     if (window.fetch) {
       const _fetch = window.fetch;
       window.fetch = function () {
@@ -305,7 +162,6 @@
               silentlyCapture(url);
               return resp;
             }
-            // try clone and peek
             try {
               const clone = resp.clone();
               const text = await clone.text();
