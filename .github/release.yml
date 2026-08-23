@@ -1,0 +1,25 @@
+changelog:
+  categories:
+    - title: "🐛 Bug Fixes"
+      labels:
+        - "fix"
+        - "bug"
+    - title: "♻️ Code Refactoring & Improvements"
+      labels:
+        - "refactor"
+        - "perf"
+    - title: "📚 Documentation"
+      labels:
+        - "docs"
+    - title: "🛠️ Build & Tooling"
+      labels:
+        - "build"
+        - "chore"
+        - "ci"
+    - title: "✨ New Features"
+      labels:
+        - "feat"
+        - "enhancement"
+  exclude:
+    labels:
+      - "ignore-for-release"
