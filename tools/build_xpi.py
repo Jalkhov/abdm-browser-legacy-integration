@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+# tools/build_xpi.py
+
 """
 Build an XPI for AB Download Manager Legacy by zipping the contents of the source
 directory (not the parent folder) using ZIP_STORED (no compression) and renaming
@@ -21,7 +22,7 @@ EM_RDF_NS = "http://www.mozilla.org/2004/em-rdf#"
 
 
 def get_version_from_install_rdf(install_rdf_path: Path) -> str | None:
-    if not install_rdf_path.exists():
+    if not install_rdf_path.is_file():
         return None
     try:
         tree = ET.parse(install_rdf_path)
@@ -30,13 +31,14 @@ def get_version_from_install_rdf(install_rdf_path: Path) -> str | None:
         version_elem = root.find(f".//{{{EM_RDF_NS}}}version")
         if version_elem is not None and version_elem.text:
             return version_elem.text.strip()
+
         # Fallback: find any element named 'version'
         for elem in root.iter():
-            if elem.tag.endswith("}version") or elem.tag == "version":
-                if elem.text:
-                    return elem.text.strip()
-    except ET.ParseError:
-        return None
+            if (elem.tag.endswith("}version") or elem.tag == "version") and elem.text:
+                return elem.text.strip()
+    except ET.ParseError as e:
+        print(f"Warning: Failed to parse install.rdf: {e}")
+
     return None
 
 
@@ -50,15 +52,13 @@ def create_xpi_from_dir(src_dir: Path, out_file: Path) -> None:
     if not src_dir.is_dir():
         raise SystemExit(f"Source directory does not exist: {src_dir}")
 
-    compression = zipfile.ZIP_STORED
-    out_file_parent = out_file.parent
-    out_file_parent.mkdir(parents=True, exist_ok=True)
+    out_file.parent.mkdir(parents=True, exist_ok=True)
 
     # Determine repository root (assume tools/ is directly under repo root)
     repo_root = Path(__file__).resolve().parent.parent
     readme_path = repo_root / "README.md"
 
-    with zipfile.ZipFile(out_file, mode="w", compression=compression) as zf:
+    with zipfile.ZipFile(out_file, mode="w", compression=zipfile.ZIP_STORED) as zf:
         # First, write the contents of src/ (but skip any README.md inside src so
         # the repository README can be used as the extension README at archive root)
         for path in sorted(src_dir.rglob("*")):
@@ -71,12 +71,12 @@ def create_xpi_from_dir(src_dir: Path, out_file: Path) -> None:
                 zf.write(path, arcname)
 
         # Then, include repository README.md at the archive root if available
-        if readme_path.exists() and readme_path.is_file():
+        if readme_path.is_file():
             try:
                 zf.write(readme_path, "README.md")
-            except Exception:
-                # Non-fatal: if for some reason we can't add README, continue
-                pass
+            except OSError as e:
+                # Non-fatal: log the specific exception instead of passing silently
+                print(f"Warning: Could not add README.md to archive: {e}")
 
 
 def main(argv: list[str] | None = None) -> int:
