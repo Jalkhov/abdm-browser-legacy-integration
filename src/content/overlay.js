@@ -177,6 +177,16 @@ var ABDMPort = {
         const url = channel.URI ? channel.URI.spec : null;
         if (!url) return;
 
+        // Skip non-2xx status codes (e.g. 403 Forbidden, 404 Not Found, Captchas)
+        try {
+          if (channel.responseStatus < 200 || channel.responseStatus >= 300)
+            return;
+        } catch (e) {}
+
+        // Skip HTML or plain text components (prevents capturing error pages as downloads)
+        const contentType = channel.contentType || "";
+        if (contentType.toLowerCase().startsWith("text/")) return;
+
         // Skip already processed via click (recent dedupe)
         for (let i = 0; i < ABDMPort._recent.length; i++) {
           const it = ABDMPort._recent[i];
@@ -186,10 +196,9 @@ var ABDMPort = {
         // Filter ignored patterns
         if (ignorePatterns.some((pattern) => url.includes(pattern))) return;
 
-        // Examine content-disposition / type / extension
+        // Examine content-disposition and extension
         const disposition =
           channel.getResponseHeader("Content-Disposition") || "";
-        const contentType = channel.contentType || "";
         const filename =
           ABDMPort._filenameFromDisposition(disposition) ||
           ABDMPort._filenameFromUrl(url) ||
@@ -228,6 +237,18 @@ var ABDMPort = {
 
         if (!matched) return;
 
+        // Extract EXACT request headers sent by the browser to bypass anti-bot protections
+        let exactRequestHeaders = {};
+        try {
+          channel.visitRequestHeaders({
+            visitHeader: function (name, value) {
+              exactRequestHeaders[name] = value;
+            },
+          });
+        } catch (e) {
+          ABDMPort._log("warn", "Failed to extract exact request headers");
+        }
+
         // Cancel browser download before it prompts user
         try {
           channel.cancel(Components.results.NS_BINDING_ABORTED);
@@ -244,9 +265,10 @@ var ABDMPort = {
 
         const pageUrl = channel.referrer ? channel.referrer.spec : null;
 
-        // schedule async to avoid interfering with observers chain
+        // Schedule async to avoid interfering with observers chain
         setTimeout(function () {
-          ABDMPort.sendToAB(url, pageUrl, filename);
+          // Pass the exact headers directly to sendToAB
+          ABDMPort.sendToAB(url, pageUrl, filename, exactRequestHeaders);
         }, 0);
       },
     };
@@ -685,7 +707,7 @@ var ABDMPort = {
   // - 'http'     : POST a pref 'abdm_legacy.http_endpoint'
   // - 'process'  : ejecutar un binario local (pref 'abdm_legacy.process_path')
   // - 'auto'     : intentar HTTP y si falla usar protocolo
-  sendToAB: function (url, pageUrl, suggestedName) {
+  sendToAB: function (url, pageUrl, suggestedName, providedHeaders) {
     ABDMPort._log(
       "info",
       "sendToAB called for " +
@@ -727,8 +749,11 @@ var ABDMPort = {
       } catch (e) {}
     }
 
-    // Extraemos las credenciales del navegador para enviarlas al gestor
-    const headers = ABDMPort._getHeadersForUrl(url, pageUrl);
+    // Usar cabeceras exactas si se pasaron, de lo contrario usar el fallback nativo
+    const headers =
+      providedHeaders && Object.keys(providedHeaders).length > 0
+        ? providedHeaders
+        : ABDMPort._getHeadersForUrl(url, pageUrl);
 
     // Handle local process execution directly in the overlay
     if (method === "process") {

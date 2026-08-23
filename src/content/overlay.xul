@@ -9,7 +9,7 @@
     <!-- Inyección nativa en el menú contextual de la página -->
     <popup id="contentAreaContextMenu">
         <menuitem id="abdm-send-link"
-                  label="Download with AB DM"
+                  label="Download with ABDM"
                   class="menuitem-iconic"
                   image="chrome://abdm_legacy/skin/icons/icon-16.png"
                   oncommand="ABDMPort.onSendLinkCommand();"
