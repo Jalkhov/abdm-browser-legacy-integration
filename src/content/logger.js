@@ -2,16 +2,23 @@
 // Provides consistent console/reportError logging across the chrome code.
 var ABDMLogger = (function () {
   function safeConsole(fn, msg) {
-    try {
-      if (typeof console !== "undefined" && console && console[fn])
-        console[fn]("ABDM: " + msg);
-    } catch (e) {}
+    if (
+      typeof console !== "undefined" &&
+      console &&
+      typeof console[fn] === "function"
+    ) {
+      console[fn]("ABDM: " + msg);
+    }
   }
 
   function safeReport(msg) {
-    try {
+    if (
+      typeof Components !== "undefined" &&
+      Components.utils &&
+      typeof Components.utils.reportError === "function"
+    ) {
       Components.utils.reportError("ABDM: " + msg);
-    } catch (e) {}
+    }
   }
 
   return {
