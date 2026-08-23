@@ -1,6 +1,6 @@
 # AB Download Manager Browser Legacy Integration
 
-![Status](https://img.shields.io/badge/status-beta-red)
+![Status](https://img.shields.io/badge/status-stable-brightgreen)
 
 This extension is a port of the official [ab-download-manager-browser-integration](https://github.com/amir1376/ab-download-manager-browser-integration) specifically designed for **XUL-based browsers** (legacy engine). So far, it has been tested and verified on **Pale Moon 33.9.1 x64 (Windows)**.
 
