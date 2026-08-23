@@ -17,7 +17,7 @@ The integration aims to provide a seamless downloading experience between your l
 
 - [x] **Automatic Link Capture:** Automatically intercepts native downloads and forwards them to AB Download Manager.
 - [x] **Header Passthrough:** Securely forwards browser session data (User-Agent, Referer, Cookies) to bypass common hotlink protections and server restrictions.
-- [ ] **Context Menu Integration:** Add a `Download With AB DM` option when right-clicking links or media.
+- [x] **Context Menu Integration:** Add a `Download With AB DM` option when right-clicking links or media.
 - [ ] **Batch Downloading:** Show a `Download Selected` popup when the user highlights a section of a webpage containing multiple links.
 
 *Tip: You can manage which file extensions are automatically captured by accessing the add-on options via `Tools > Add-ons > AB Download Manager > Options`.*
