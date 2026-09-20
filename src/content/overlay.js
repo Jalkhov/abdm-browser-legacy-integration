@@ -142,6 +142,9 @@ var ABDMPort = {
       } catch (e) {
         ABDMPort._log("warn", "net observer registration error: " + e);
       }
+      try {
+        ABDMPort._registerPrefsObserver();
+      } catch (e) {}
     } catch (e) {
       Components.utils.reportError("ABDMPort init error: " + e);
     }
@@ -149,6 +152,187 @@ var ABDMPort = {
 
   _netObserverRegistered: false,
   _netObserver: null,
+  // Reachability state: null = unknown, true = reachable, false = unreachable.
+  _abdmOnline: null,
+  _healthTimer: null,
+  _healthInFlight: false,
+  _prefsObserver: null,
+
+  // How often (ms) we re-check that ABDM is reachable.
+  HEALTH_INTERVAL_MS: 15000,
+
+  _allowPassDownloadIfAppNotRespond: function () {
+    try {
+      const prefs = ABDMPort._getPrefs();
+      if (!prefs) return true;
+      return prefs.getBoolPref("abdm_legacy.allowPassDownloadIfAppNotRespond");
+    } catch (e) {
+      return true;
+    }
+  },
+
+  _checkAbdmHealth: function () {
+    if (ABDMPort._healthInFlight) return;
+    if (typeof ABDMBackend === "undefined" || !ABDMBackend.ping) return;
+    ABDMPort._healthInFlight = true;
+    try {
+      ABDMBackend.ping(1200).then(
+        function (online) {
+          ABDMPort._healthInFlight = false;
+          ABDMPort._abdmOnline = !!online;
+        },
+        function () {
+          ABDMPort._healthInFlight = false;
+          ABDMPort._abdmOnline = false;
+        },
+      );
+    } catch (e) {
+      ABDMPort._healthInFlight = false;
+    }
+  },
+
+  _startHealthMonitor: function () {
+    ABDMPort._checkAbdmHealth();
+    if (ABDMPort._healthTimer) return;
+    try {
+      ABDMPort._healthTimer = setInterval(function () {
+        ABDMPort._checkAbdmHealth();
+      }, ABDMPort.HEALTH_INTERVAL_MS);
+    } catch (e) {}
+  },
+
+  _stopHealthMonitor: function () {
+    if (ABDMPort._healthTimer) {
+      try {
+        clearInterval(ABDMPort._healthTimer);
+      } catch (e) {}
+      ABDMPort._healthTimer = null;
+    }
+  },
+
+  // Hand a download back to the browser when ABDM could not take it, so the
+  // user does not lose the file after we cancelled the original channel.
+  _fallbackNativeDownload: function (url, filename, pageUrl) {
+    try {
+      // Prevent the observer from re-capturing the retried request.
+      ABDMPort._recent.unshift({ url: url, when: Date.now() });
+      if (ABDMPort._recent.length > 200) ABDMPort._recent.length = 200;
+
+      // Preferred: the browser's own save routine
+      // (toolkit/content/contentAreaUtils.js). It is exposed as a global in the
+      // browser window, re-issues the request with cookies and goes through the
+      // normal download flow (download manager, prompts, etc.).
+      // Signature: saveURL(url, fileName, pickerTitleKey, bypassCache,
+      //                    skipPrompt, referrer, sourceDoc, isPrivate).
+      if (typeof saveURL === "function") {
+        try {
+          saveURL(url, filename || null, null, true, false, null, null, false);
+          ABDMPort._log(
+            "info",
+            "fallback: re-issued download via saveURL: " + url,
+          );
+          return true;
+        } catch (e) {
+          ABDMPort._log("warn", "fallback: saveURL failed: " + e);
+        }
+      }
+
+      if (
+        typeof gBrowser !== "undefined" &&
+        gBrowser &&
+        typeof gBrowser.saveURL === "function"
+      ) {
+        try {
+          gBrowser.saveURL(
+            url,
+            filename || null,
+            null,
+            null,
+            pageUrl || null,
+            false,
+            false,
+            null,
+          );
+          ABDMPort._log(
+            "info",
+            "fallback: re-issued download via gBrowser.saveURL: " + url,
+          );
+          return true;
+        } catch (e) {
+          ABDMPort._log("warn", "fallback: gBrowser.saveURL failed: " + e);
+        }
+      }
+
+      // Last resort: open a background tab so the browser downloads it.
+      if (
+        typeof gBrowser !== "undefined" &&
+        gBrowser &&
+        typeof gBrowser.addTab === "function"
+      ) {
+        try {
+          gBrowser.addTab(url, { inBackground: true });
+          ABDMPort._log(
+            "info",
+            "fallback: opened a background tab for " + url,
+          );
+          return true;
+        } catch (e) {
+          ABDMPort._log("warn", "fallback: gBrowser.addTab failed: " + e);
+        }
+      }
+
+      ABDMPort._log(
+        "error",
+        "fallback: no way to re-issue the download for " + url,
+      );
+      return false;
+    } catch (e) {
+      ABDMPort._log(
+        "error",
+        "fallback: could not hand download back to the browser: " + e,
+      );
+      return false;
+    }
+  },
+
+  _registerPrefsObserver: function () {
+    if (ABDMPort._prefsObserver) return;
+    try {
+      const observerService = Components.classes[
+        "@mozilla.org/observer-service;1"
+      ].getService(Components.interfaces.nsIObserverService);
+      ABDMPort._prefsObserver = {
+        observe: function (subject, topic, data) {
+          if (topic !== "abdm-prefs-changed") return;
+          try {
+            ABDMPort._checkAbdmHealth();
+          } catch (e) {}
+        },
+      };
+      observerService.addObserver(
+        ABDMPort._prefsObserver,
+        "abdm-prefs-changed",
+        false,
+      );
+    } catch (e) {
+      ABDMPort._prefsObserver = null;
+    }
+  },
+
+  _unregisterPrefsObserver: function () {
+    if (!ABDMPort._prefsObserver) return;
+    try {
+      const observerService = Components.classes[
+        "@mozilla.org/observer-service;1"
+      ].getService(Components.interfaces.nsIObserverService);
+      observerService.removeObserver(
+        ABDMPort._prefsObserver,
+        "abdm-prefs-changed",
+      );
+    } catch (e) {}
+    ABDMPort._prefsObserver = null;
+  },
+
   _maybeRegisterNetObserver: function () {
     const prefs = ABDMPort._getPrefs();
     if (!prefs) return;
@@ -237,6 +421,19 @@ var ABDMPort = {
 
         if (!matched) return;
 
+        // Never cancel a download unless we know ABDM is reachable. Otherwise
+        // the user would lose the file (browser cancelled + app not running).
+        const allowPass = ABDMPort._allowPassDownloadIfAppNotRespond();
+        if (allowPass && ABDMPort._abdmOnline === false) {
+          ABDMPort._log(
+            "info",
+            "ABDM unreachable; letting the browser handle: " + url,
+          );
+          // Refresh the reachability state for the next download.
+          ABDMPort._checkAbdmHealth();
+          return;
+        }
+
         // Extract EXACT request headers sent by the browser to bypass anti-bot protections
         let exactRequestHeaders = {};
         try {
@@ -268,7 +465,20 @@ var ABDMPort = {
         // Schedule async to avoid interfering with observers chain
         setTimeout(function () {
           // Pass the exact headers directly to sendToAB
-          ABDMPort.sendToAB(url, pageUrl, filename, exactRequestHeaders);
+          ABDMPort.sendToAB(url, pageUrl, filename, exactRequestHeaders).then(
+            function (success) {
+              if (success) {
+                ABDMPort._abdmOnline = true;
+                return;
+              }
+              ABDMPort._abdmOnline = false;
+              // We already cancelled the browser download, so hand it back so
+              // the user still gets the file.
+              if (allowPass) {
+                ABDMPort._fallbackNativeDownload(url, filename, pageUrl);
+              }
+            },
+          );
         }, 0);
       },
     };
@@ -280,6 +490,7 @@ var ABDMPort = {
         false,
       );
       ABDMPort._netObserverRegistered = true;
+      ABDMPort._startHealthMonitor();
       ABDMPort._log("info", "Network observer registered");
     } catch (e) {
       ABDMPort._log("error", "Failed to register net observer: " + e);
@@ -297,6 +508,7 @@ var ABDMPort = {
       );
       ABDMPort._netObserverRegistered = false;
       ABDMPort._netObserver = null;
+      ABDMPort._stopHealthMonitor();
       ABDMPort._log("info", "network observer unregistered");
     } catch (e) {
       ABDMPort._log("warn", "error unregistering net observer: " + e);
@@ -708,105 +920,117 @@ var ABDMPort = {
   // - 'process'  : ejecutar un binario local (pref 'abdm_legacy.process_path')
   // - 'auto'     : intentar HTTP y si falla usar protocolo
   sendToAB: function (url, pageUrl, suggestedName, providedHeaders) {
-    ABDMPort._log(
-      "info",
-      "sendToAB called for " +
-        url +
-        (pageUrl ? " (page: " + pageUrl + ")" : ""),
-    );
+    return new Promise(function (resolve) {
+      ABDMPort._log(
+        "info",
+        "sendToAB called for " +
+          url +
+          (pageUrl ? " (page: " + pageUrl + ")" : ""),
+      );
 
-    // Dedupe recent sends to avoid flooding protocol handlers or loops
-    const NOW = Date.now();
-    const DEDUPE_MS = 3000;
+      // Dedupe recent sends to avoid flooding protocol handlers or loops
+      const NOW = Date.now();
+      const DEDUPE_MS = 3000;
 
-    for (let i = 0; i < ABDMPort._recent.length; i++) {
-      const it = ABDMPort._recent[i];
-      if (it && it.url === url && NOW - it.when < DEDUPE_MS) {
-        ABDMPort._log("info", "skipping duplicate sendToAB for " + url);
-        return;
+      for (let i = 0; i < ABDMPort._recent.length; i++) {
+        const it = ABDMPort._recent[i];
+        if (it && it.url === url && NOW - it.when < DEDUPE_MS) {
+          ABDMPort._log("info", "skipping duplicate sendToAB for " + url);
+          // Already handled recently: report success so callers do not fall back.
+          return resolve(true);
+        }
       }
-    }
 
-    ABDMPort._inflight = ABDMPort._inflight || {};
-    if (ABDMPort._inflight[url]) {
-      ABDMPort._log("info", "sendToAB already in-flight for " + url);
-      return;
-    }
+      ABDMPort._inflight = ABDMPort._inflight || {};
+      if (ABDMPort._inflight[url]) {
+        ABDMPort._log("info", "sendToAB already in-flight for " + url);
+        return resolve(true);
+      }
 
-    ABDMPort._inflight[url] = true;
-    setTimeout(function () {
-      if (ABDMPort._inflight) delete ABDMPort._inflight[url];
-    }, 5000);
+      ABDMPort._inflight[url] = true;
+      setTimeout(function () {
+        if (ABDMPort._inflight) delete ABDMPort._inflight[url];
+      }, 5000);
 
-    ABDMPort._recent.unshift({ url: url, when: NOW });
-    if (ABDMPort._recent.length > 200) ABDMPort._recent.length = 200;
+      ABDMPort._recent.unshift({ url: url, when: NOW });
+      if (ABDMPort._recent.length > 200) ABDMPort._recent.length = 200;
 
-    const prefs = ABDMPort._getPrefs();
-    let method = "auto";
-    if (prefs) {
-      try {
-        method = prefs.getCharPref("abdm_legacy.method");
-      } catch (e) {}
-    }
+      const prefs = ABDMPort._getPrefs();
+      let method = "auto";
+      if (prefs) {
+        try {
+          method = prefs.getCharPref("abdm_legacy.method");
+        } catch (e) {}
+      }
 
-    // Usar cabeceras exactas si se pasaron, de lo contrario usar el fallback nativo
-    const headers =
-      providedHeaders && Object.keys(providedHeaders).length > 0
-        ? providedHeaders
-        : ABDMPort._getHeadersForUrl(url, pageUrl);
+      // Usar cabeceras exactas si se pasaron, de lo contrario usar el fallback nativo
+      const headers =
+        providedHeaders && Object.keys(providedHeaders).length > 0
+          ? providedHeaders
+          : ABDMPort._getHeadersForUrl(url, pageUrl);
 
-    // Handle local process execution directly in the overlay
-    if (method === "process") {
-      try {
-        const path = prefs ? prefs.getCharPref("abdm_legacy.process_path") : "";
-        if (!path) {
+      // Handle local process execution directly in the overlay
+      if (method === "process") {
+        try {
+          const path = prefs ? prefs.getCharPref("abdm_legacy.process_path") : "";
+          if (!path) {
+            ABDMPort._log(
+              "warn",
+              "process: abdm_legacy.process_path is not configured",
+            );
+            return resolve(false);
+          }
+
+          const file = Components.classes[
+            "@mozilla.org/file/local;1"
+          ].createInstance(Components.interfaces.nsIFile);
+          file.initWithPath(path);
+
+          let args = [];
+          const argstr = prefs.getCharPref("abdm_legacy.process_args");
+          if (argstr) args = argstr.split(" ");
+
+          const urlIndex = args.indexOf("%URL%");
+          if (urlIndex !== -1) {
+            args[urlIndex] = url;
+          } else {
+            args.push(url);
+          }
+
+          const process = Components.classes[
+            "@mozilla.org/process/util;1"
+          ].createInstance(Components.interfaces.nsIProcess);
+          process.init(file);
+          process.run(false, args, args.length);
           ABDMPort._log(
-            "warn",
-            "process: abdm_legacy.process_path is not configured",
+            "info",
+            "process started " + path + " args=" + args.join(" "),
           );
-          return;
+          return resolve(true);
+        } catch (e) {
+          ABDMPort._log("error", "process error: " + e);
+          return resolve(false);
         }
-
-        const file = Components.classes[
-          "@mozilla.org/file/local;1"
-        ].createInstance(Components.interfaces.nsIFile);
-        file.initWithPath(path);
-
-        let args = [];
-        const argstr = prefs.getCharPref("abdm_legacy.process_args");
-        if (argstr) args = argstr.split(" ");
-
-        const urlIndex = args.indexOf("%URL%");
-        if (urlIndex !== -1) {
-          args[urlIndex] = url;
-        } else {
-          args.push(url);
-        }
-
-        const process = Components.classes[
-          "@mozilla.org/process/util;1"
-        ].createInstance(Components.interfaces.nsIProcess);
-        process.init(file);
-        process.run(false, args, args.length);
-        ABDMPort._log(
-          "info",
-          "process started " + path + " args=" + args.join(" "),
-        );
-      } catch (e) {
-        ABDMPort._log("error", "process error: " + e);
       }
-      return;
-    }
 
-    // Pasamos los headers hacia el Backend unificado
-    if (typeof ABDMBackend !== "undefined" && ABDMBackend.send) {
-      ABDMBackend.send(url, pageUrl, suggestedName, headers).then((success) => {
-        if (!success)
-          ABDMPort._log("warn", "ABDMBackend failed to deliver payload");
-      });
-    } else {
-      ABDMPort._log("error", "ABDMBackend module not found!");
-    }
+      // Pasamos los headers hacia el Backend unificado
+      if (typeof ABDMBackend !== "undefined" && ABDMBackend.send) {
+        ABDMBackend.send(url, pageUrl, suggestedName, headers).then(
+          function (success) {
+            if (!success)
+              ABDMPort._log("warn", "ABDMBackend failed to deliver payload");
+            resolve(!!success);
+          },
+          function (err) {
+            ABDMPort._log("error", "ABDMBackend send rejected: " + err);
+            resolve(false);
+          },
+        );
+      } else {
+        ABDMPort._log("error", "ABDMBackend module not found!");
+        resolve(false);
+      }
+    });
   },
 };
 
@@ -830,6 +1054,9 @@ window.addEventListener(
   function onUnload() {
     try {
       ABDMPort._maybeUnregisterNetObserver();
+    } catch (e) {}
+    try {
+      ABDMPort._unregisterPrefsObserver();
     } catch (e) {}
   },
   false,
