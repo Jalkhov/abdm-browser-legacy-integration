@@ -23,6 +23,19 @@
             </description>
         </groupbox>
 
+        <groupbox>
+            <caption label="Connection"/>
+            <label value="API Key (leave empty if not enabled in ABDM):" control="opt-api-key"/>
+            <textbox id="opt-api-key" style="margin-bottom: 5px;"/>
+            <description class="abdm-hint" style="margin-bottom: 5px;">
+                Found in AB Download Manager &gt; Settings &gt; Browser Integration. Sent as the X-API-Key header.
+            </description>
+            <hbox pack="end" spacing="5" align="center">
+                <label id="opt-api-status" value="" class="abdm-hint"/>
+                <button id="opt-test-connection" label="Test connection"/>
+            </hbox>
+        </groupbox>
+
         <groupbox flex="1">
             <caption label="File Capture &amp; Filters"/>
 
