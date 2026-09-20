@@ -30,6 +30,23 @@ var ABDMPort = {
     Components.utils.reportError(prefix + msg);
   },
 
+  _overlayBundle: null,
+  _str: function (key, fallback) {
+    try {
+      if (!ABDMPort._overlayBundle) {
+        const svc = Components.classes[
+          "@mozilla.org/intl/stringbundle;1"
+        ].getService(Components.interfaces.nsIStringBundleService);
+        ABDMPort._overlayBundle = svc.createBundle(
+          "chrome://abdm_legacy/locale/overlay.properties",
+        );
+      }
+      return ABDMPort._overlayBundle.GetStringFromName(key);
+    } catch (e) {
+      return fallback;
+    }
+  },
+
   _getHeadersForUrl: function (url, pageUrl) {
     let headers = {};
 
@@ -71,7 +88,10 @@ var ABDMPort = {
         // use createElement which works in both XUL and HTML chrome documents.
         let menuItem = document.createElement("menuitem");
         menuItem.setAttribute("id", "abdm-send-link");
-        menuItem.setAttribute("label", "Enviar a AB Download Manager");
+        menuItem.setAttribute(
+          "label",
+          ABDMPort._str("abdm.sendLink.label", "Download with ABDM"),
+        );
         menuItem.addEventListener(
           "command",
           function () {
@@ -110,9 +130,9 @@ var ABDMPort = {
       try {
         ABDMPort.syncMenuState();
       } catch (e) {}
-      try {
-        ABDMPort._placeToolbarButtonIfMissing();
-      } catch (e) {}
+      // The toolbar button lives in the toolbar palette; users add it from
+      // "Customize". We intentionally do not inject it into a toolbar, as that
+      // change is not persisted and can duplicate after restarts.
       try {
         // Register network observer for automatic (non-click) downloads
         ABDMPort._maybeRegisterNetObserver();
@@ -767,7 +787,6 @@ var ABDMPort = {
         { name: "process_path", type: "char" },
         { name: "process_args", type: "char" },
         { name: "autoCaptureLinks", type: "bool" },
-        { name: "popupEnabled", type: "bool" },
         { name: "silentAddDownload", type: "bool" },
         { name: "registeredFileTypes", type: "char" },
         { name: "ignoredUrlPatterns", type: "char" },
@@ -837,14 +856,6 @@ var ABDMPort = {
         }
       } catch (e) {}
       try {
-        const vPop = prefs.getBoolPref("abdm_legacy.popupEnabled");
-        const elPop = document.getElementById("abdm-showpopups");
-        if (elPop) {
-          if (vPop) elPop.setAttribute("checked", "true");
-          else elPop.removeAttribute("checked");
-        }
-      } catch (e) {}
-      try {
         const vSilent = prefs.getBoolPref("abdm_legacy.silentAddDownload");
         const elSilent = document.getElementById("abdm-silentadd");
         if (elSilent) {
@@ -854,44 +865,6 @@ var ABDMPort = {
       } catch (e) {}
     } catch (e) {
       Components.utils.reportError("ABDMPort syncMenuState error: " + e);
-    }
-  },
-
-  _placeToolbarButtonIfMissing: function () {
-    try {
-      const btn = document.getElementById("abdm-toolbar-button");
-      if (!btn) return;
-      // if already placed in a toolbar, nothing to do
-      if (btn.parentNode && btn.parentNode.id !== "BrowserToolbarPalette")
-        return;
-      // Try common toolbar ids; if not found, append to the first toolbar element
-      const toolbarIds = ["nav-bar", "toolbar-menubar", "navigator-toolbox"];
-      let placed = false;
-      for (const id of toolbarIds) {
-        try {
-          const t = document.getElementById(id);
-          if (t) {
-            t.appendChild(btn);
-            placed = true;
-            break;
-          }
-        } catch (e) {
-          /* ignore per-target errors */
-        }
-      }
-      if (!placed) {
-        try {
-          const toolbars = document.getElementsByTagName("toolbar");
-          if (toolbars && toolbars.length > 0) {
-            toolbars[0].appendChild(btn);
-            placed = true;
-          }
-        } catch (e) {
-          /* ignore */
-        }
-      }
-    } catch (e) {
-      Components.utils.reportError("ABDMPort placeToolbar error: " + e);
     }
   },
 

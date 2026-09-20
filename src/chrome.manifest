@@ -1,5 +1,6 @@
 content abdm_legacy content/
 resource abdm_legacy content/
+locale  abdm_legacy en-US locale/en-US/
 overlay chrome://browser/content/browser.xul chrome://abdm_legacy/content/overlay.xul
 
 # Recursos estáticos (skin registrado)

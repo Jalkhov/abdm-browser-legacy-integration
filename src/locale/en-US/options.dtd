@@ -1,0 +1,35 @@
+<!-- Localization strings for the options window. -->
+
+<!-- Window -->
+<!ENTITY abdm.options.title               "AB Download Manager - Options">
+<!ENTITY abdm.options.header              "AB Download Manager Settings">
+
+<!-- General Integration -->
+<!ENTITY abdm.options.general.caption     "General Integration">
+<!ENTITY abdm.options.autocapture.label   "Auto Capture Links">
+<!ENTITY abdm.options.autocapture.hint    "When you click on a link in your browser, it will be automatically captured for download by the App.">
+<!ENTITY abdm.options.silentadd.label     "Add downloads silently (no confirmation dialog)">
+
+<!-- Connection -->
+<!ENTITY abdm.options.connection.caption  "Connection">
+<!ENTITY abdm.options.serverurl.label     "Server URL:">
+<!ENTITY abdm.options.method.label        "Send method:">
+<!ENTITY abdm.options.method.auto         "Auto (HTTP, then protocol)">
+<!ENTITY abdm.options.method.http         "HTTP">
+<!ENTITY abdm.options.method.protocol     "Protocol (abdm://)">
+<!ENTITY abdm.options.method.process      "External process">
+<!ENTITY abdm.options.apikey.label        "API Key (leave empty if not enabled in ABDM):">
+<!ENTITY abdm.options.apikey.hint         "Found in AB Download Manager > Settings > Browser Integration. Sent as the X-API-Key header.">
+<!ENTITY abdm.options.test.label          "Test connection">
+
+<!-- File Capture & Filters -->
+<!ENTITY abdm.options.filters.caption     "File Capture &amp; Filters">
+<!ENTITY abdm.options.extensions.label    "Registered file extensions (space separated):">
+<!ENTITY abdm.options.extensions.hint     "Enter each file extension you want to be captured (e.g., zip rar mp4).">
+<!ENTITY abdm.options.minsize.label       "Minimum file size (KB, 0 = no minimum):">
+<!ENTITY abdm.options.patterns.label      "Ignored URL patterns (one per line):">
+<!ENTITY abdm.options.reset.label         "Reset to default">
+
+<!-- Buttons -->
+<!ENTITY abdm.options.save.label          "Save">
+<!ENTITY abdm.options.close.label         "Close">

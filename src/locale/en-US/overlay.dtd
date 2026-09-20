@@ -1,0 +1,8 @@
+<!-- Localization strings for the browser overlay (toolbar menu + context menu). -->
+
+<!ENTITY abdm.sendLink.label              "Download with ABDM">
+<!ENTITY abdm.menu.autocapture.label      "Autocapture links">
+<!ENTITY abdm.menu.silentadd.label        "Add downloads silently">
+<!ENTITY abdm.menu.moreSettings.label     "More Settings...">
+<!ENTITY abdm.toolbar.label               "ABDM">
+<!ENTITY abdm.toolbar.tooltip             "AB Download Manager Legacy">

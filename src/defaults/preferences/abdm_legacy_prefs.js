@@ -4,7 +4,6 @@ pref("abdm_legacy.http_endpoint", "http://127.0.0.1:15151/add");
 pref("abdm_legacy.process_path", "");
 pref("abdm_legacy.process_args", "");
 pref("abdm_legacy.autoCaptureLinks", true);
-pref("abdm_legacy.popupEnabled", true);
 pref("abdm_legacy.silentAddDownload", false);
 pref("abdm_legacy.silentStartDownload", false);
 pref("abdm_legacy.api_key", "");

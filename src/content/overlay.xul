@@ -1,4 +1,5 @@
 <?xml version="1.0"?>
+<!DOCTYPE overlay SYSTEM "chrome://abdm_legacy/locale/overlay.dtd">
 <?xml-stylesheet href="chrome://abdm_legacy/content/overlay.css" type="text/css"?>
 <overlay xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
 
@@ -9,7 +10,7 @@
     <!-- Inyección nativa en el menú contextual de la página -->
     <popup id="contentAreaContextMenu">
         <menuitem id="abdm-send-link"
-                  label="Download with ABDM"
+                  label="&abdm.sendLink.label;"
                   class="menuitem-iconic"
                   image="chrome://abdm_legacy/skin/icons/icon-16.png"
                   oncommand="ABDMPort.onSendLinkCommand();"
@@ -22,16 +23,15 @@
         <toolbarbutton id="abdm-toolbar-button"
                        class="toolbarbutton-1"
                        removable="true"
-                       label="ABDM"
-                       tooltiptext="AB Download Manager Legacy"
+                       label="&abdm.toolbar.label;"
+                       tooltiptext="&abdm.toolbar.tooltip;"
                        type="menu"
                        image="chrome://abdm_legacy/skin/icons/icon-16.png">
             <menupopup id="abdm-toolbar-menu">
-                <menuitem type="checkbox" id="abdm-autocapture" label="Autocapture links" oncommand="ABDMPort.togglePrefBool('autoCaptureLinks', this.getAttribute('checked')=='true');"/>
-                <menuitem type="checkbox" id="abdm-showpopups" label="Show Popups" oncommand="ABDMPort.togglePrefBool('popupEnabled', this.getAttribute('checked')=='true');"/>
-                <menuitem type="checkbox" id="abdm-silentadd" label="Add downloads silently" oncommand="ABDMPort.togglePrefBool('silentAddDownload', this.getAttribute('checked')=='true');"/>
+                <menuitem type="checkbox" id="abdm-autocapture" label="&abdm.menu.autocapture.label;" oncommand="ABDMPort.togglePrefBool('autoCaptureLinks', this.getAttribute('checked')=='true');"/>
+                <menuitem type="checkbox" id="abdm-silentadd" label="&abdm.menu.silentadd.label;" oncommand="ABDMPort.togglePrefBool('silentAddDownload', this.getAttribute('checked')=='true');"/>
                 <menuseparator/>
-                <menuitem id="abdm-more-settings" label="More Settings..." class="menuitem-iconic" image="chrome://abdm_legacy/skin/icons/icon-16.png" oncommand="ABDMPort.openOptions();"/>
+                <menuitem id="abdm-more-settings" label="&abdm.menu.moreSettings.label;" class="menuitem-iconic" image="chrome://abdm_legacy/skin/icons/icon-16.png" oncommand="ABDMPort.openOptions();"/>
             </menupopup>
         </toolbarbutton>
     </toolbarpalette>
