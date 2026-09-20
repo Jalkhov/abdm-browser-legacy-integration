@@ -83,45 +83,22 @@ var ABDMPort = {
       }
 
       // Monitor popup show to toggle visibilidad según el nodo
-      cm.addEventListener(
-        "popupshowing",
-        function () {
-          ABDMPort.updateContextMenu(cm);
-        },
-        false,
-      );
+      if (cm) {
+        cm.addEventListener(
+          "popupshowing",
+          function () {
+            ABDMPort.updateContextMenu(cm);
+          },
+          false,
+        );
+      }
 
-      // Inject content listener into pages to detect media/links from the page context
+      // Passive link grabber (only useful for the not-yet-implemented batch
+      // download feature). Disabled by default to avoid overhead and the risk
+      // of interfering with pages.
       try {
-        // Listen to page loads and inject a small content script into each document
-        if (typeof gBrowser !== "undefined") {
-          // Inject into already open tabs
-          for (let i = 0; i < gBrowser.browsers.length; i++) {
-            const browser = gBrowser.getBrowserAtIndex(i);
-            try {
-              ABDMPort.injectIntoBrowser(browser);
-            } catch (e) {
-              /* ignore per-tab errors */
-            }
-          }
-
-          // Inject on future loads
-          gBrowser.addEventListener(
-            "DOMContentLoaded",
-            function (event) {
-              try {
-                const doc = event.originalTarget;
-                if (doc && doc.defaultView) {
-                  ABDMPort.injectIntoBrowser(doc.defaultView);
-                }
-              } catch (e) {
-                Components.utils.reportError(
-                  "ABDMPort inject load error: " + e,
-                );
-              }
-            },
-            true,
-          );
+        if (ABDMPort._isLinkGrabberEnabled()) {
+          ABDMPort._installLinkGrabber();
         }
       } catch (e) {
         Components.utils.reportError("ABDMPort init inject error: " + e);
@@ -304,6 +281,10 @@ var ABDMPort = {
       ABDMPort._prefsObserver = {
         observe: function (subject, topic, data) {
           if (topic !== "abdm-prefs-changed") return;
+          // autoCaptureLinks may have been toggled in the options window.
+          try {
+            ABDMPort._maybeRegisterNetObserver();
+          } catch (e) {}
           try {
             ABDMPort._checkAbdmHealth();
           } catch (e) {}
@@ -333,6 +314,36 @@ var ABDMPort = {
     ABDMPort._prefsObserver = null;
   },
 
+  // Minimum capture size in bytes (0 = no minimum).
+  _getMinCaptureBytes: function () {
+    try {
+      const prefs = ABDMPort._getPrefs();
+      if (!prefs) return 0;
+      const kb = prefs.getIntPref("abdm_legacy.captureFileSizeMinimumKb");
+      return kb > 0 ? kb * 1024 : 0;
+    } catch (e) {
+      return 0;
+    }
+  },
+
+  // True when the URL belongs to the configured ABDM endpoint (so we never
+  // capture the response of our own requests).
+  _isAbdmEndpointUrl: function (url) {
+    try {
+      const prefs = ABDMPort._getPrefs();
+      let endpoint = "http://127.0.0.1:15151/add";
+      try {
+        endpoint = prefs.getCharPref("abdm_legacy.http_endpoint") || endpoint;
+      } catch (e) {}
+      const m = /^https?:\/\/[^/]+/i.exec(endpoint);
+      return m
+        ? url.toLowerCase().indexOf(m[0].toLowerCase()) === 0
+        : false;
+    } catch (e) {
+      return false;
+    }
+  },
+
   _maybeRegisterNetObserver: function () {
     const prefs = ABDMPort._getPrefs();
     if (!prefs) return;
@@ -350,8 +361,6 @@ var ABDMPort = {
     const observerService = Cc["@mozilla.org/observer-service;1"].getService(
       Ci.nsIObserverService,
     );
-    const registeredExts = ABDMPort._getRegisteredExtensions();
-    const ignorePatterns = ABDMPort._getIgnoredPatterns();
 
     ABDMPort._netObserver = {
       observe: function (subject, topic, data) {
@@ -360,6 +369,9 @@ var ABDMPort = {
         const channel = subject.QueryInterface(Ci.nsIHttpChannel);
         const url = channel.URI ? channel.URI.spec : null;
         if (!url) return;
+
+        // Never capture the response of the requests we make to ABDM itself.
+        if (ABDMPort._isAbdmEndpointUrl(url)) return;
 
         // Skip non-2xx status codes (e.g. 403 Forbidden, 404 Not Found, Captchas)
         try {
@@ -377,8 +389,11 @@ var ABDMPort = {
           if (it && it.url === url && Date.now() - it.when < 5000) return;
         }
 
-        // Filter ignored patterns
+        // Read the filters on every event so changes made in Options apply
+        // immediately without having to re-register the observer.
+        const ignorePatterns = ABDMPort._getIgnoredPatterns();
         if (ignorePatterns.some((pattern) => url.includes(pattern))) return;
+        const registeredExts = ABDMPort._getRegisteredExtensions();
 
         // Examine content-disposition and extension
         const disposition =
@@ -389,16 +404,57 @@ var ABDMPort = {
           "";
         const lowerFilename = filename.toLowerCase();
 
-        // Determine if this is a top-level document load
+        // Determine the content policy type of this load.
+        let policyType = null;
+        try {
+          if (channel.loadInfo) {
+            if (
+              typeof channel.loadInfo.externalContentPolicyType !== "undefined"
+            ) {
+              policyType = channel.loadInfo.externalContentPolicyType;
+            } else if (
+              typeof channel.loadInfo.contentPolicyType !== "undefined"
+            ) {
+              policyType = channel.loadInfo.contentPolicyType;
+            }
+          }
+        } catch (e) {}
+
+        const CP = Ci.nsIContentPolicy;
+
+        // Skip subresource loads (XHR/fetch, media, images, scripts, fonts,
+        // ...). They are the main source of unwanted captures on modern web
+        // apps and are never user-initiated downloads.
+        const SUBRESOURCE_TYPES = CP
+          ? [
+              CP.TYPE_SCRIPT,
+              CP.TYPE_IMAGE,
+              CP.TYPE_STYLESHEET,
+              CP.TYPE_OBJECT,
+              CP.TYPE_XBL,
+              CP.TYPE_PING,
+              CP.TYPE_XMLHTTPREQUEST,
+              CP.TYPE_OBJECT_SUBREQUEST,
+              CP.TYPE_DTD,
+              CP.TYPE_FONT,
+              CP.TYPE_MEDIA,
+              CP.TYPE_WEBSOCKET,
+              CP.TYPE_CSP_REPORT,
+              CP.TYPE_XSLT,
+              CP.TYPE_BEACON,
+              CP.TYPE_FETCH,
+              CP.TYPE_IMAGESET,
+              CP.TYPE_WEB_MANIFEST,
+            ]
+          : [];
+        if (policyType !== null && SUBRESOURCE_TYPES.indexOf(policyType) !== -1) {
+          return;
+        }
+
+        // Determine if this is a top-level document load.
         let isTopLevel = false;
-        if (
-          channel.loadInfo &&
-          typeof channel.loadInfo.contentPolicyType !== "undefined"
-        ) {
-          const TYPE_DOCUMENT = Ci.nsIContentPolicy
-            ? Ci.nsIContentPolicy.TYPE_DOCUMENT
-            : 6;
-          isTopLevel = channel.loadInfo.contentPolicyType === TYPE_DOCUMENT;
+        if (policyType !== null) {
+          isTopLevel = policyType === (CP ? CP.TYPE_DOCUMENT : 6);
         } else if (channel.loadFlags) {
           const LOAD_DOCUMENT_URI = Ci.nsIChannel.LOAD_DOCUMENT_URI;
           isTopLevel =
@@ -408,7 +464,9 @@ var ABDMPort = {
         let matched = false;
         const isAttachment = /attachment/i.test(disposition);
 
-        // We only cancel when it's an attachment anywhere, or a top-level navigation to a registered extension
+        // Capture real frame/document attachments, or a top-level navigation
+        // to a registered extension. When the content policy type is unknown
+        // (older builds) keep the permissive attachment behaviour.
         if (isAttachment) {
           matched = true;
         } else if (isTopLevel) {
@@ -420,6 +478,24 @@ var ABDMPort = {
         }
 
         if (!matched) return;
+
+        // Respect a minimum file size so empty/tiny responses are not captured.
+        const minBytes = ABDMPort._getMinCaptureBytes();
+        if (minBytes > 0) {
+          let contentLength = -1;
+          try {
+            contentLength = parseInt(
+              channel.getResponseHeader("Content-Length"),
+              10,
+            );
+          } catch (e) {}
+          if (
+            !isNaN(contentLength) &&
+            contentLength >= 0 &&
+            contentLength < minBytes
+          )
+            return;
+        }
 
         // Never cancel a download unless we know ABDM is reachable. Otherwise
         // the user would lose the file (browser cancelled + app not running).
@@ -566,6 +642,40 @@ var ABDMPort = {
     return null;
   },
 
+  _isLinkGrabberEnabled: function () {
+    try {
+      const prefs = ABDMPort._getPrefs();
+      return prefs ? prefs.getBoolPref("abdm_legacy.enableLinkGrabber") : false;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  _installLinkGrabber: function () {
+    if (typeof gBrowser === "undefined") return;
+    // Inject into already open tabs.
+    for (let i = 0; i < gBrowser.browsers.length; i++) {
+      try {
+        ABDMPort.injectIntoBrowser(gBrowser.getBrowserAtIndex(i));
+      } catch (e) {
+        /* ignore per-tab errors */
+      }
+    }
+    // Inject on future loads (including subframes).
+    gBrowser.addEventListener(
+      "DOMContentLoaded",
+      function (event) {
+        try {
+          const doc = event.originalTarget;
+          if (doc && doc.defaultView) {
+            ABDMPort.injectIntoBrowser(doc.defaultView);
+          }
+        } catch (e) {}
+      },
+      true,
+    );
+  },
+
   injectIntoBrowser: function (browserWindow) {
     try {
       // browserWindow can be a <browser> element or a window; normalize
@@ -575,123 +685,51 @@ var ABDMPort = {
         browserWindow.document &&
         browserWindow.document.documentElement
       ) {
-        // it's a browser element (XUL)
         win = browserWindow.contentWindow || browserWindow.content;
       } else if (browserWindow && browserWindow.location) {
-        // it's a DOMWindow
         win = browserWindow;
       }
       if (!win) return;
 
-      const doc = win.document;
-      if (!doc) return;
-
-      // Only inject into regular content pages. Skip internal browser pages
-      // (about:, chrome:, resource:, moz-extension:, view-source:, data:, etc.).
+      // Only inject into regular content pages. Skip internal browser pages.
       let href = "";
       try {
         href = (win.location && win.location.href) || "";
       } catch (e) {
         href = "";
       }
-      // allow only http(s) and file URLs for injection
-      if (!/^https?:|^file:/i.test(href)) {
-        try {
-          ABDMPort._log(
-            "info",
-            "skipping injection for non-content page: " + (href || "(unknown)"),
-          );
-        } catch (e) {}
+      if (!/^https?:|^file:/i.test(href)) return;
+
+      // Avoid injecting multiple times.
+      try {
+        if (win.__abdmLinkGrabberLoaded) return;
+        win.__abdmLinkGrabberLoaded = true;
+      } catch (e) {
         return;
       }
 
-      // Avoid injecting multiple times
-      if (doc.getElementById("abdm-linkgrabber-injected")) return;
-
-      const script = doc.createElement("script");
-      script.setAttribute("id", "abdm-linkgrabber-injected");
-      script.setAttribute("type", "text/javascript");
-      script.setAttribute(
-        "src",
+      // Run the content script in a sandbox bound to the page window and
+      // principal. Injecting <script src="chrome://..."> from web content does
+      // not work, which is why the old implementation never ran.
+      const sandbox = new Components.utils.Sandbox(win, {
+        sandboxPrototype: win,
+        wantXrays: false,
+      });
+      const loader = Components.classes[
+        "@mozilla.org/moz/jssubscript-loader;1"
+      ].getService(Components.interfaces.mozIJSSubScriptLoader);
+      loader.loadSubScript(
         "chrome://abdm_legacy/content/linkgrabber-content.js",
-      );
-      // append to document to execute in page context
-      (doc.documentElement || doc.body || doc).appendChild(script);
-      try {
-        ABDMPort._log(
-          "info",
-          "injected linkgrabber-content.js into " + (href || "(unknown)"),
-        );
-      } catch (e) {}
-
-      // listen to messages coming from the page
-      win.addEventListener(
-        "message",
-        function (ev) {
-          try {
-            const data = ev.data;
-            if (!data) return;
-            if (data.type === "abdm-detected" && data.url) {
-              try {
-                ABDMPort._log(
-                  "info",
-                  "message received abdm-detected -> " +
-                    data.url +
-                    (data.pageUrl ? " (page: " + data.pageUrl + ")" : ""),
-                );
-              } catch (e) {}
-              ABDMPort.sendToAB(
-                data.url,
-                data.pageUrl || null,
-                data.suggestedName || null,
-              );
-            }
-            if (data.type === "abdm-ready") {
-              // content script confirmed injection
-              ABDMPort._log(
-                "info",
-                "linkgrabber script ready in tab " +
-                  (win.location.href || "(unknown)"),
-              );
-            }
-          } catch (e) {
-            Components.utils.reportError(
-              "ABDMPort message handler error: " + e,
-            );
-          }
-        },
-        false,
+        sandbox,
+        "UTF-8",
       );
 
-      // After appending the script, set a short timeout to detect injection failure
-      try {
-        let ready = false;
-        const onReady = function (ev) {
-          try {
-            if (ev && ev.data && ev.data.type === "abdm-ready") {
-              ready = true;
-              win.removeEventListener("message", onReady, false);
-            }
-          } catch (e) {}
-        };
-        win.addEventListener("message", onReady, false);
-        setTimeout(function () {
-          try {
-            if (!ready) {
-              ABDMPort._log(
-                "warn",
-                "linkgrabber script did not signal ready in " +
-                  (win.location.href || "(unknown)"),
-              );
-            }
-            try {
-              win.removeEventListener("message", onReady, false);
-            } catch (e) {}
-          } catch (e) {}
-        }, 2500);
-      } catch (e) {}
+      ABDMPort._log(
+        "info",
+        "injected linkgrabber-content.js into " + (href || "(unknown)"),
+      );
     } catch (e) {
-      Components.utils.reportError("ABDMPort injectIntoBrowser error: " + e);
+      ABDMPort._log("warn", "injectIntoBrowser error: " + e);
     }
   },
 
@@ -1033,6 +1071,24 @@ var ABDMPort = {
     });
   },
 };
+
+// Share the capture dedupe state across all browser windows. Without this,
+// every open window registers its own network observer and the same download
+// could be delivered to the app once per window. The module is a per-app
+// singleton, so all windows read and mutate the same arrays.
+(function () {
+  try {
+    const holder = {};
+    Components.utils.import("resource://abdm_legacy/shared.jsm", holder);
+    const shared = holder.ABDMSharedState;
+    if (shared) {
+      ABDMPort._recent = shared.recent;
+      ABDMPort._inflight = shared.inflight;
+    }
+  } catch (e) {
+    // Keep the per-window defaults defined in the object literal.
+  }
+})();
 
 // Inicializar cuando la ventana principal esté lista
 window.addEventListener(
