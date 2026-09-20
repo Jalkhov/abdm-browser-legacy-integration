@@ -1,0 +1,31 @@
+/* Theme-aware styles for the AB Download Manager options window.
+ *
+ * IMPORTANT: never set a background without a matching text color (and vice
+ * versa). Third-party themes such as Dark Moon style the chrome <window> with
+ * a dark background and white text, while the system color -moz-Dialog can
+ * still resolve to a light color. Forcing only "background-color: -moz-Dialog"
+ * is what caused white text on a light background.
+ *
+ * By leaving the container transparent we let the active theme decide the
+ * window background and its matching text color, which works with both the
+ * default theme and dark themes.
+ */
+
+@namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
+
+#abdm-options-body {
+  padding: 15px;
+}
+
+.abdm-header-title {
+  font-weight: bold;
+  font-size: 1.2em;
+}
+
+/* Secondary / hint text that stays readable on light and dark themes alike.
+ * Do NOT use the GrayText system color for static text: it can have very low
+ * contrast on dark themes. Dimming the inherited color is theme-agnostic. */
+.abdm-hint {
+  color: inherit;
+  opacity: 0.65;
+}
