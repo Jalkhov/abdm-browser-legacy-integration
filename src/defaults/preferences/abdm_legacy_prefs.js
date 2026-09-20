@@ -6,6 +6,11 @@ pref("abdm_legacy.process_args", "");
 pref("abdm_legacy.autoCaptureLinks", true);
 pref("abdm_legacy.popupEnabled", true);
 pref("abdm_legacy.silentAddDownload", false);
+pref("abdm_legacy.silentStartDownload", false);
+pref("abdm_legacy.api_key", "");
+// If the app does not respond, let the browser download the file instead of
+// cancelling it and losing it.
+pref("abdm_legacy.allowPassDownloadIfAppNotRespond", true);
 pref(
   "abdm_legacy.registeredFileTypes",
   "zip rar 7z iso tar gz exe msi deb jar apk bin mp3 aac pdf mp4 3gp avi mkv wav mpeg srt"
