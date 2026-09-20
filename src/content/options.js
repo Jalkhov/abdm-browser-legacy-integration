@@ -21,6 +21,35 @@ var ABDMOptions = {
         apiKeyEl.value = prefs.getCharPref("abdm_legacy.api_key");
       }
 
+      const endpointEl = document.getElementById("opt-http-endpoint");
+      if (endpointEl) {
+        try {
+          endpointEl.value = prefs.getCharPref("abdm_legacy.http_endpoint");
+        } catch (e) {
+          endpointEl.value = "http://127.0.0.1:15151/add";
+        }
+      }
+
+      const methodEl = document.getElementById("opt-method");
+      if (methodEl) {
+        try {
+          methodEl.value = prefs.getCharPref("abdm_legacy.method");
+        } catch (e) {
+          methodEl.value = "auto";
+        }
+      }
+
+      const minSizeEl = document.getElementById("opt-min-size");
+      if (minSizeEl) {
+        try {
+          minSizeEl.value = String(
+            prefs.getIntPref("abdm_legacy.captureFileSizeMinimumKb"),
+          );
+        } catch (e) {
+          minSizeEl.value = "0";
+        }
+      }
+
       const fileTypesEl = document.getElementById("opt-registered-filetypes");
       if (fileTypesEl) {
         fileTypesEl.value = prefs.getCharPref(
@@ -52,6 +81,28 @@ var ABDMOptions = {
       const apiKeyEl = document.getElementById("opt-api-key");
       if (apiKeyEl) {
         prefs.setCharPref("abdm_legacy.api_key", apiKeyEl.value.trim());
+      }
+
+      const endpointEl = document.getElementById("opt-http-endpoint");
+      if (endpointEl && endpointEl.value.trim()) {
+        prefs.setCharPref(
+          "abdm_legacy.http_endpoint",
+          endpointEl.value.trim(),
+        );
+      }
+
+      const methodEl = document.getElementById("opt-method");
+      if (methodEl && methodEl.value) {
+        prefs.setCharPref("abdm_legacy.method", methodEl.value);
+      }
+
+      const minSizeEl = document.getElementById("opt-min-size");
+      if (minSizeEl) {
+        const kb = parseInt(minSizeEl.value, 10);
+        prefs.setIntPref(
+          "abdm_legacy.captureFileSizeMinimumKb",
+          isNaN(kb) || kb < 0 ? 0 : kb,
+        );
       }
 
       const fileTypesEl = document.getElementById("opt-registered-filetypes");
@@ -94,9 +145,14 @@ var ABDMOptions = {
     try {
       const prefs = ABDMOptions._getPrefs();
       let endpoint = "http://127.0.0.1:15151/add";
-      try {
-        endpoint = prefs.getCharPref("abdm_legacy.http_endpoint") || endpoint;
-      } catch (e) {}
+      const endpointEl = document.getElementById("opt-http-endpoint");
+      if (endpointEl && endpointEl.value.trim()) {
+        endpoint = endpointEl.value.trim();
+      } else {
+        try {
+          endpoint = prefs.getCharPref("abdm_legacy.http_endpoint") || endpoint;
+        } catch (e) {}
+      }
 
       let apiKey = "";
       const apiKeyEl = document.getElementById("opt-api-key");

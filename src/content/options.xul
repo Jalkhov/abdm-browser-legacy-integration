@@ -25,6 +25,17 @@
 
         <groupbox>
             <caption label="Connection"/>
+            <label value="Server URL:" control="opt-http-endpoint"/>
+            <textbox id="opt-http-endpoint" style="margin-bottom: 5px;"/>
+            <label value="Send method:" control="opt-method"/>
+            <menulist id="opt-method" style="margin-bottom: 5px;">
+                <menupopup>
+                    <menuitem label="Auto (HTTP, then protocol)" value="auto"/>
+                    <menuitem label="HTTP" value="http"/>
+                    <menuitem label="Protocol (abdm://)" value="protocol"/>
+                    <menuitem label="External process" value="process"/>
+                </menupopup>
+            </menulist>
             <label value="API Key (leave empty if not enabled in ABDM):" control="opt-api-key"/>
             <textbox id="opt-api-key" style="margin-bottom: 5px;"/>
             <description class="abdm-hint" style="margin-bottom: 5px;">
@@ -44,6 +55,9 @@
             <description class="abdm-hint" style="margin-bottom: 15px;">
                 Enter each file extension you want to be captured (e.g., zip rar mp4).
             </description>
+
+            <label value="Minimum file size (KB, 0 = no minimum):" control="opt-min-size"/>
+            <textbox id="opt-min-size" style="margin-bottom: 15px;"/>
 
             <label value="Ignored URL patterns (one per line):" control="opt-ignored-patterns"/>
             <textbox id="opt-ignored-patterns" multiline="true" flex="1" rows="3" style="margin-bottom: 5px;"/>
